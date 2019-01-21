@@ -281,7 +281,7 @@ func TestResolvePipelineRun(t *testing.T) {
 				Name: "mytask1",
 				Inputs: []v1alpha1.TaskResourceBinding{{
 					Name: "input1",
-					ResourceRef: v1alpha1.PipelineResourceRef{
+					ResourceRef: &v1alpha1.PipelineResourceRef{
 						Name: "someresource",
 					},
 				}},
@@ -289,7 +289,7 @@ func TestResolvePipelineRun(t *testing.T) {
 				Name: "mytask2",
 				Outputs: []v1alpha1.TaskResourceBinding{{
 					Name: "output1",
-					ResourceRef: v1alpha1.PipelineResourceRef{
+					ResourceRef: &v1alpha1.PipelineResourceRef{
 						Name: "someresource",
 					},
 				}},
@@ -297,7 +297,7 @@ func TestResolvePipelineRun(t *testing.T) {
 				Name: "mytask3",
 				Outputs: []v1alpha1.TaskResourceBinding{{
 					Name: "output1",
-					ResourceRef: v1alpha1.PipelineResourceRef{
+					ResourceRef: &v1alpha1.PipelineResourceRef{
 						Name: "someresource",
 					},
 				}},

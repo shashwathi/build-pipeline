@@ -73,17 +73,23 @@ func (ts *TaskRunSpec) Validate() *apis.FieldError {
 }
 
 func (i TaskRunInputs) Validate(path string) *apis.FieldError {
-	if err := checkForPipelineResourceDuplicates(i.Resources, fmt.Sprintf("%s.Resources.Name", path)); err != nil {
+	if err := validatePipelineResources(i.Resources, fmt.Sprintf("%s.Resources.Name", path)); err != nil {
 		return err
 	}
 	return validateParameters(i.Params)
 }
 
 func (o TaskRunOutputs) Validate(path string) *apis.FieldError {
-	return checkForPipelineResourceDuplicates(o.Resources, fmt.Sprintf("%s.Resources.Name", path))
+	return validatePipelineResources(o.Resources, fmt.Sprintf("%s.Resources.Name", path))
 }
 
-func checkForPipelineResourceDuplicates(resources []TaskResourceBinding, path string) *apis.FieldError {
+/*
+validatePipelineResources validates whether
+- any resource is declare more than once
+- if both resource reference and resource spec is defined at the same time
+- either resource ref or resource spec is defined
+*/
+func validatePipelineResources(resources []TaskResourceBinding, path string) *apis.FieldError {
 	encountered := map[string]struct{}{}
 	for _, r := range resources {
 		// We should provide only one binding for each resource required by the Task.
@@ -92,6 +98,15 @@ func checkForPipelineResourceDuplicates(resources []TaskResourceBinding, path st
 			return apis.ErrMultipleOneOf(path)
 		}
 		encountered[name] = struct{}{}
+
+		// Check that one of resource ref and resource Spec is present
+		if (r.ResourceRef != nil && r.ResourceRef.Name != "") && r.ResourceSpec != nil {
+			return apis.ErrDisallowedFields(fmt.Sprintf("%s.ResourceRef", path), fmt.Sprintf("%s.ResourceSpec", path))
+		}
+		// Check that one of resource ref and resource Spec is present
+		if (r.ResourceRef == nil || (r.ResourceRef != nil && r.ResourceRef.Name == "")) && r.ResourceSpec == nil {
+			return apis.ErrMissingField(fmt.Sprintf("%s.ResourceRef", path), fmt.Sprintf("%s.ResourceSpec", path))
+		}
 	}
 	return nil
 }

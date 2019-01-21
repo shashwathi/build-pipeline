@@ -454,7 +454,7 @@ func TaskRunInputsResource(name string, ops ...TaskResourceBindingOp) TaskRunInp
 	return func(i *v1alpha1.TaskRunInputs) {
 		binding := &v1alpha1.TaskResourceBinding{
 			Name: name,
-			ResourceRef: v1alpha1.PipelineResourceRef{
+			ResourceRef: &v1alpha1.PipelineResourceRef{
 				Name: name,
 			},
 		}
@@ -468,7 +468,9 @@ func TaskRunInputsResource(name string, ops ...TaskResourceBindingOp) TaskRunInp
 // ResourceBindingRef set the PipelineResourceRef name to the TaskResourceBinding.
 func ResourceBindingRef(name string) TaskResourceBindingOp {
 	return func(b *v1alpha1.TaskResourceBinding) {
-		b.ResourceRef.Name = name
+		b.ResourceRef = &v1alpha1.PipelineResourceRef{
+			Name: name,
+		}
 	}
 }
 
@@ -504,7 +506,7 @@ func TaskRunOutputsResource(name string, ops ...TaskResourceBindingOp) TaskRunOu
 	return func(i *v1alpha1.TaskRunOutputs) {
 		binding := &v1alpha1.TaskResourceBinding{
 			Name: name,
-			ResourceRef: v1alpha1.PipelineResourceRef{
+			ResourceRef: &v1alpha1.PipelineResourceRef{
 				Name: name,
 			},
 		}

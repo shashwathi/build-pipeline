@@ -161,14 +161,14 @@ func TestTaskRunWitTaskRef(t *testing.T) {
 			Inputs: v1alpha1.TaskRunInputs{
 				Resources: []v1alpha1.TaskResourceBinding{{
 					Name: "git-resource",
-					ResourceRef: v1alpha1.PipelineResourceRef{
+					ResourceRef: &v1alpha1.PipelineResourceRef{
 						Name:       "my-git",
 						APIVersion: "a1",
 					},
 					Paths: []string{"source-folder"},
 				}, {
 					Name: "another-git-resource",
-					ResourceRef: v1alpha1.PipelineResourceRef{
+					ResourceRef: &v1alpha1.PipelineResourceRef{
 						Name: "another-git-resource",
 					},
 					Paths: []string{"source-folder"},
@@ -178,7 +178,7 @@ func TestTaskRunWitTaskRef(t *testing.T) {
 			Outputs: v1alpha1.TaskRunOutputs{
 				Resources: []v1alpha1.TaskResourceBinding{{
 					Name: "git-resource",
-					ResourceRef: v1alpha1.PipelineResourceRef{
+					ResourceRef: &v1alpha1.PipelineResourceRef{
 						Name: "git-resource",
 					},
 					Paths: []string{"output-folder"},

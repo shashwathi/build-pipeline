@@ -28,24 +28,24 @@ import (
 func TestResolveTaskRun(t *testing.T) {
 	inputs := []v1alpha1.TaskResourceBinding{{
 		Name: "repoToBuildFrom",
-		ResourceRef: v1alpha1.PipelineResourceRef{
+		ResourceRef: &v1alpha1.PipelineResourceRef{
 			Name: "git-repo",
 		},
 	}, {
 		Name: "clusterToUse",
-		ResourceRef: v1alpha1.PipelineResourceRef{
+		ResourceRef: &v1alpha1.PipelineResourceRef{
 			Name: "k8s-cluster",
 		},
 	}}
 
 	outputs := []v1alpha1.TaskResourceBinding{{
 		Name: "imageToBuild",
-		ResourceRef: v1alpha1.PipelineResourceRef{
+		ResourceRef: &v1alpha1.PipelineResourceRef{
 			Name: "image",
 		},
 	}, {
 		Name: "gitRepoToUpdate",
-		ResourceRef: v1alpha1.PipelineResourceRef{
+		ResourceRef: &v1alpha1.PipelineResourceRef{
 			Name: "another-git-repo",
 		},
 	}}
@@ -138,7 +138,7 @@ func TestResolveTaskRun(t *testing.T) {
 func TestResolveTaskRun_missingOutput(t *testing.T) {
 	outputs := []v1alpha1.TaskResourceBinding{{
 		Name: "repoToUpdate",
-		ResourceRef: v1alpha1.PipelineResourceRef{
+		ResourceRef: &v1alpha1.PipelineResourceRef{
 			Name: "another-git-repo",
 		}}}
 
@@ -153,7 +153,7 @@ func TestResolveTaskRun_missingOutput(t *testing.T) {
 func TestResolveTaskRun_missingInput(t *testing.T) {
 	inputs := []v1alpha1.TaskResourceBinding{{
 		Name: "repoToBuildFrom",
-		ResourceRef: v1alpha1.PipelineResourceRef{
+		ResourceRef: &v1alpha1.PipelineResourceRef{
 			Name: "git-repo",
 		}}}
 

@@ -62,14 +62,14 @@ var paramTaskRun = &v1alpha1.TaskRun{
 }
 
 var inputs = []v1alpha1.TaskResourceBinding{{
-	ResourceRef: v1alpha1.PipelineResourceRef{
+	ResourceRef: &v1alpha1.PipelineResourceRef{
 		Name: "git-resource",
 	},
 	Name: "workspace",
 }}
 
 var outputs = []v1alpha1.TaskResourceBinding{{
-	ResourceRef: v1alpha1.PipelineResourceRef{
+	ResourceRef: &v1alpha1.PipelineResourceRef{
 		Name: "image-resource",
 	},
 	Name: "imageToUse",

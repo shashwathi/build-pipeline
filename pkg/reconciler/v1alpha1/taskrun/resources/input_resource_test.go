@@ -243,7 +243,7 @@ func TestAddResourceToBuild(t *testing.T) {
 			},
 			Inputs: v1alpha1.TaskRunInputs{
 				Resources: []v1alpha1.TaskResourceBinding{{
-					ResourceRef: v1alpha1.PipelineResourceRef{
+					ResourceRef: &v1alpha1.PipelineResourceRef{
 						Name: "the-git",
 					},
 					Name: "gitspace",
@@ -304,7 +304,7 @@ func TestAddResourceToBuild(t *testing.T) {
 				},
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "the-git-with-branch",
 						},
 						Name: "gitspace",
@@ -355,12 +355,12 @@ func TestAddResourceToBuild(t *testing.T) {
 				},
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "the-git-with-branch",
 						},
 						Name: "gitspace",
 					}, {
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "the-git-with-branch",
 						},
 						Name: "git-duplicate-space",
@@ -417,7 +417,7 @@ func TestAddResourceToBuild(t *testing.T) {
 				},
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "the-git",
 						},
 						Name: "gitspace",
@@ -466,7 +466,7 @@ func TestAddResourceToBuild(t *testing.T) {
 				},
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "the-git-with-branch",
 						},
 						Name: "gitspace",
@@ -517,7 +517,7 @@ func TestAddResourceToBuild(t *testing.T) {
 			Spec: v1alpha1.TaskRunSpec{
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "the-git",
 						},
 						Name:  "gitspace",
@@ -569,7 +569,7 @@ func TestAddResourceToBuild(t *testing.T) {
 			Spec: v1alpha1.TaskRunSpec{
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "storage1",
 						},
 						Name: "workspace",
@@ -625,7 +625,7 @@ func TestAddResourceToBuild(t *testing.T) {
 			Spec: v1alpha1.TaskRunSpec{
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "storage1",
 						},
 						Name:  "workspace",
@@ -677,7 +677,7 @@ func TestAddResourceToBuild(t *testing.T) {
 			Spec: v1alpha1.TaskRunSpec{
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "storage-gcs-invalid",
 						},
 						Name: "workspace",
@@ -699,7 +699,7 @@ func TestAddResourceToBuild(t *testing.T) {
 			Spec: v1alpha1.TaskRunSpec{
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "storage-gcs-invalid",
 						},
 						Name: "workspace",
@@ -758,7 +758,7 @@ func TestAddResourceToBuild(t *testing.T) {
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
 						Name: "target-cluster",
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "cluster3",
 						},
 					}},
@@ -820,7 +820,7 @@ func TestAddResourceToBuild(t *testing.T) {
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
 						Name: "target-cluster",
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "cluster2",
 						},
 					}},
@@ -929,7 +929,7 @@ func Test_StorageInputResource(t *testing.T) {
 				Inputs: v1alpha1.TaskRunInputs{
 					Resources: []v1alpha1.TaskResourceBinding{{
 						Name: "gcs-input-resource",
-						ResourceRef: v1alpha1.PipelineResourceRef{
+						ResourceRef: &v1alpha1.PipelineResourceRef{
 							Name: "storage-gcs-keys",
 						},
 					}},

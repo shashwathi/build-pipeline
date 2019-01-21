@@ -40,7 +40,7 @@ func getBoundResource(resourceName string, boundResources []v1alpha1.TaskResourc
 			return &br, nil
 		}
 	}
-	return nil, fmt.Errorf("couldnt find resource named %q in bound resources %s", resourceName, boundResources)
+	return nil, fmt.Errorf("couldnt find resource named %q in bound resources %v", resourceName, boundResources)
 }
 
 // AddInputResource reads the inputs resources and adds the corresponding container steps
