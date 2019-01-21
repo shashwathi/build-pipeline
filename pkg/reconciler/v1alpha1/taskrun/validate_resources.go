@@ -24,21 +24,21 @@ import (
 	"github.com/knative/build-pipeline/pkg/reconciler/v1alpha1/taskrun/resources"
 )
 
-func validateInputResources(inputs *v1alpha1.Inputs, providedResources map[string]*v1alpha1.PipelineResource) error {
+func validateInputResources(inputs *v1alpha1.Inputs, providedResources map[string]*v1alpha1.PipelineResourceSpec) error {
 	if inputs != nil {
 		return validateResources(inputs.Resources, providedResources)
 	}
 	return validateResources([]v1alpha1.TaskResource{}, providedResources)
 }
 
-func validateOutputResources(outputs *v1alpha1.Outputs, providedResources map[string]*v1alpha1.PipelineResource) error {
+func validateOutputResources(outputs *v1alpha1.Outputs, providedResources map[string]*v1alpha1.PipelineResourceSpec) error {
 	if outputs != nil {
 		return validateResources(outputs.Resources, providedResources)
 	}
 	return validateResources([]v1alpha1.TaskResource{}, providedResources)
 }
 
-func validateResources(neededResources []v1alpha1.TaskResource, providedResources map[string]*v1alpha1.PipelineResource) error {
+func validateResources(neededResources []v1alpha1.TaskResource, providedResources map[string]*v1alpha1.PipelineResourceSpec) error {
 	needed := make([]string, 0, len(neededResources))
 	for _, resource := range neededResources {
 		needed = append(needed, resource.Name)
@@ -61,8 +61,8 @@ func validateResources(neededResources []v1alpha1.TaskResource, providedResource
 			// This case should never be hit due to the check for missing resources at the beginning of the function
 			return fmt.Errorf("resource %q is missing", resource.Name)
 		}
-		if resource.Type != r.Spec.Type {
-			return fmt.Errorf("resource %q should be type %q but was %q", resource.Name, r.Spec.Type, resource.Type)
+		if resource.Type != r.Type {
+			return fmt.Errorf("resource %q should be type %q but was %q", resource.Name, r.Type, resource.Type)
 		}
 	}
 	return nil

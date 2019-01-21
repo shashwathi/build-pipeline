@@ -70,9 +70,19 @@ func AddInputResource(
 			return nil, fmt.Errorf("Failed to get bound resource: %s", err)
 		}
 
-		resource, err := pipelineResourceLister.PipelineResources(taskRun.Namespace).Get(boundResource.ResourceRef.Name)
-		if err != nil {
-			return nil, fmt.Errorf("task %q failed to Get Pipeline Resource: %q", taskName, boundResource)
+		var resource *v1alpha1.PipelineResource
+		if boundResource.ResourceRef != nil {
+			resource, err = pipelineResourceLister.PipelineResources(taskRun.Namespace).Get(boundResource.ResourceRef.Name)
+			if err != nil {
+				return nil, fmt.Errorf("task %q failed to Get Pipeline Resource: %q", taskName, boundResource)
+			}
+		} else if boundResource.ResourceSpec != nil {
+			resource = &v1alpha1.PipelineResource{
+				// ObjectMeta: metav1.ObjectMeta{
+				// 	Name: input.Name,
+				// },
+				Spec: *boundResource.ResourceSpec,
+			}
 		}
 
 		// if taskrun is fetching resource from previous task then execute copy step instead of fetching new copy

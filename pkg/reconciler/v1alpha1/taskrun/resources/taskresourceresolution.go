@@ -29,10 +29,10 @@ type ResolvedTaskResources struct {
 	TaskSpec *v1alpha1.TaskSpec
 	// Inputs is a map from the name of the input required by the Task
 	// to the actual Resource to use for it
-	Inputs map[string]*v1alpha1.PipelineResource
+	Inputs map[string]*v1alpha1.PipelineResourceSpec
 	// Outputs is a map from the name of the output required by the Task
 	// to the actual Resource to use for it
-	Outputs map[string]*v1alpha1.PipelineResource
+	Outputs map[string]*v1alpha1.PipelineResourceSpec
 }
 
 // GetResource is a function used to retrieve PipelineResources.
@@ -45,23 +45,33 @@ func ResolveTaskResources(ts *v1alpha1.TaskSpec, taskName string, inputs []v1alp
 	rtr := ResolvedTaskResources{
 		TaskName: taskName,
 		TaskSpec: ts,
-		Inputs:   map[string]*v1alpha1.PipelineResource{},
-		Outputs:  map[string]*v1alpha1.PipelineResource{},
+		Inputs:   map[string]*v1alpha1.PipelineResourceSpec{},
+		Outputs:  map[string]*v1alpha1.PipelineResourceSpec{},
 	}
 
 	for _, r := range inputs {
-		rr, err := gr(r.ResourceRef.Name)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't retrieve referenced input PipelineResource %q: %s", r.ResourceRef.Name, err)
+		var rSpec *v1alpha1.PipelineResourceSpec
+		if r.ResourceRef != nil {
+			rr, err := gr(r.ResourceRef.Name)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't retrieve referenced input PipelineResource %q: %s", r.ResourceRef.Name, err)
+			}
+			rSpec = &rr.Spec
 		}
-		rtr.Inputs[r.Name] = rr
+		if r.ResourceSpec != nil {
+			rSpec = r.ResourceSpec
+		}
+		rtr.Inputs[r.Name] = rSpec
 	}
+
 	for _, r := range outputs {
-		rr, err := gr(r.ResourceRef.Name)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't retrieve referenced output PipelineResource %q: %s", r.ResourceRef.Name, err)
+		if r.ResourceRef != nil {
+			rr, err := gr(r.ResourceRef.Name)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't retrieve referenced output PipelineResource %q: %s", r.ResourceRef.Name, err)
+			}
+			rtr.Outputs[r.Name] = &rr.Spec
 		}
-		rtr.Outputs[r.Name] = rr
 	}
 	return &rtr, nil
 }
