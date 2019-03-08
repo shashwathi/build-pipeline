@@ -68,6 +68,9 @@ const (
 	taskRunAgentName = "taskrun-controller"
 	// taskRunControllerName defines name for TaskRun Controller
 	taskRunControllerName = "TaskRun"
+	// Event reasons
+	eventReasonFailed    = "TaskRunFailed"
+	eventReasonSucceeded = "TaskRunSucceeded"
 )
 
 var (
@@ -89,6 +92,7 @@ type Reconciler struct {
 	resourceLister    listers.PipelineResourceLister
 	tracker           tracker.Interface
 	cache             *entrypoint.Cache
+	timeoutHandler    *reconciler.TimeoutSet
 }
 
 // Check that our Reconciler implements controller.Reconciler
@@ -103,6 +107,7 @@ func NewController(
 	resourceInformer informers.PipelineResourceInformer,
 	podInformer coreinformers.PodInformer,
 	entrypointCache *entrypoint.Cache,
+	timeoutHandler *reconciler.TimeoutSet,
 ) *controller.Impl {
 
 	c := &Reconciler{
@@ -111,6 +116,7 @@ func NewController(
 		taskLister:        taskInformer.Lister(),
 		clusterTaskLister: clusterTaskInformer.Lister(),
 		resourceLister:    resourceInformer.Lister(),
+		timeoutHandler:    timeoutHandler,
 	}
 	impl := controller.NewImpl(c, c.Logger, taskRunControllerName, reconciler.MustNewStatsReporter(taskRunControllerName, c.Logger))
 
@@ -118,12 +124,14 @@ func NewController(
 	taskRunInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    impl.Enqueue,
 		UpdateFunc: controller.PassNew(impl.Enqueue),
+		DeleteFunc: impl.Enqueue,
 	})
 
 	c.tracker = tracker.New(impl.EnqueueKey, opt.GetTrackerLease())
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.tracker.OnChanged,
-		UpdateFunc: controller.PassNew(c.tracker.OnChanged),
+		AddFunc:    impl.EnqueueControllerOf,
+		UpdateFunc: controller.PassNew(impl.EnqueueControllerOf),
+		DeleteFunc: impl.EnqueueControllerOf,
 	})
 
 	c.Logger.Info("Setting up Entrypoint cache")
@@ -161,7 +169,9 @@ func (c *Reconciler) Reconcile(ctx context.Context, key string) error {
 	tr := original.DeepCopy()
 	tr.Status.InitializeConditions()
 
-	if isDone(&tr.Status) {
+	if tr.Status.IsDone() {
+		statusMapKey := fmt.Sprintf("%s/%s", taskRunControllerName, key)
+		c.timeoutHandler.Release(statusMapKey)
 		return nil
 	}
 
@@ -178,6 +188,7 @@ func (c *Reconciler) Reconcile(ctx context.Context, key string) error {
 		// to status with this stale state.
 	} else if _, err := c.updateStatus(tr); err != nil {
 		c.Logger.Warn("Failed to update taskRun status", zap.Error(err))
+		c.Recorder.Event(tr, corev1.EventTypeWarning, eventReasonFailed, "TaskRun failed to update status")
 		return err
 	}
 	// Since we are using the status subresource, it is not possible to update
@@ -185,10 +196,15 @@ func (c *Reconciler) Reconcile(ctx context.Context, key string) error {
 	if !reflect.DeepEqual(original.ObjectMeta.Labels, tr.ObjectMeta.Labels) {
 		if _, err := c.updateLabels(tr); err != nil {
 			c.Logger.Warn("Failed to update TaskRun labels", zap.Error(err))
+			c.Recorder.Event(tr, corev1.EventTypeWarning, eventReasonFailed, "TaskRun failed to update labels")
 			return err
 		}
 	}
-
+	if err == nil {
+		c.Recorder.Event(tr, corev1.EventTypeNormal, eventReasonSucceeded, "TaskRun reconciled successfully")
+	} else {
+		c.Recorder.Event(tr, corev1.EventTypeWarning, eventReasonFailed, "TaskRunRun failed to reconcile")
+	}
 	return err
 }
 
@@ -216,7 +232,7 @@ func (c *Reconciler) getTaskFunc(tr *v1alpha1.TaskRun) resources.GetTask {
 
 func (c *Reconciler) reconcile(ctx context.Context, tr *v1alpha1.TaskRun) error {
 	// If the taskrun is cancelled, kill resources and update status
-	if isCancelled(tr.Spec) {
+	if tr.Spec.IsCancelled() {
 		before := tr.Status.GetCondition(duckv1alpha1.ConditionSucceeded)
 		err := cancelTaskRun(tr, c.KubeClientSet, c.Logger)
 		after := tr.Status.GetCondition(duckv1alpha1.ConditionSucceeded)
@@ -288,6 +304,7 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1alpha1.TaskRun) error 
 			return err
 		}
 	} else {
+		go c.timeoutHandler.WaitTaskRun(tr)
 		// Build pod is not present, create build pod.
 		pod, err = c.createBuildPod(tr, rtr.TaskSpec, rtr.TaskName)
 		if err != nil {
@@ -304,7 +321,7 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1alpha1.TaskRun) error 
 				Reason:  reasonCouldntGetTask,
 				Message: fmt.Sprintf("%s %v", msg, err),
 			})
-			c.Recorder.Eventf(tr, corev1.EventTypeWarning, "BuildCreationFailed", "Failed to create build pod %q: %v", tr.Name, err)
+			c.Recorder.Eventf(tr, corev1.EventTypeWarning, eventReasonFailed, "Failed to create build pod %q: %v", tr.Name, err)
 			c.Logger.Errorf("Failed to create build pod for task %q :%v", err, tr.Name)
 			return nil
 		}
@@ -318,8 +335,11 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1alpha1.TaskRun) error 
 
 	// Translate Pod -> BuildStatus
 	buildStatus := resources.BuildStatusFromPod(pod, buildv1alpha1.BuildSpec{})
+	statusKey := fmt.Sprintf("%s/%s/%s", taskRunControllerName, tr.Namespace, tr.Name)
+	c.timeoutHandler.StatusLock(statusKey)
 	// Translate BuildStatus -> TaskRunStatus
 	updateStatusFromBuildStatus(tr, buildStatus)
+	c.timeoutHandler.StatusUnlock(statusKey)
 
 	after := tr.Status.GetCondition(duckv1alpha1.ConditionSucceeded)
 
@@ -374,11 +394,14 @@ func (c *Reconciler) updateLabels(tr *v1alpha1.TaskRun) (*v1alpha1.TaskRun, erro
 	if err != nil {
 		return nil, fmt.Errorf("Error getting TaskRun %s when updating labels: %s", tr.Name, err)
 	}
-	if !reflect.DeepEqual(tr.ObjectMeta.Labels, newTr.ObjectMeta.Labels) {
-		newTr.ObjectMeta.Labels = tr.ObjectMeta.Labels
-		return c.PipelineClientSet.TektonV1alpha1().TaskRuns(tr.Namespace).Update(newTr)
+	if reflect.DeepEqual(tr.ObjectMeta.Labels, newTr.ObjectMeta.Labels) {
+		return newTr, nil
 	}
-	return newTr, nil
+
+	// Don't modify the informers copy
+	newTaskRun := newTr.DeepCopy()
+	newTaskRun.ObjectMeta.Labels = tr.ObjectMeta.Labels
+	return c.PipelineClientSet.TektonV1alpha1().TaskRuns(tr.Namespace).Update(newTaskRun)
 }
 
 // createPod creates a Pod based on the Task's configuration, with pvcName as a
@@ -503,11 +526,6 @@ func makeLabels(s *v1alpha1.TaskRun) map[string]string {
 	}
 	labels[pipeline.GroupName+pipeline.TaskRunLabelKey] = s.Name
 	return labels
-}
-
-// isDone returns true if the TaskRun's status indicates that it is done.
-func isDone(status *v1alpha1.TaskRunStatus) bool {
-	return !status.GetCondition(duckv1alpha1.ConditionSucceeded).IsUnknown()
 }
 
 type DeletePod func(podName string, options *metav1.DeleteOptions) error

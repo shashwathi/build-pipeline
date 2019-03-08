@@ -42,6 +42,7 @@ import (
 	fakekubeclientset "k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -159,24 +160,32 @@ func getTaskRunController(d test.Data) test.TestAssets {
 	c, i := test.SeedTestData(d)
 	observer, logs := observer.New(zap.InfoLevel)
 	configMapWatcher := configmap.NewInformedWatcher(c.Kube, system.GetNamespace())
+	stopCh := make(chan struct{})
+	th := reconciler.NewTimeoutHandler(c.Kube, c.Pipeline, stopCh)
+	trc := NewController(
+		reconciler.Options{
+			Logger:            zap.New(observer).Sugar(),
+			KubeClientSet:     c.Kube,
+			PipelineClientSet: c.Pipeline,
+			ConfigMapWatcher:  configMapWatcher,
+			// create fake recorder for testing
+			Recorder: record.NewFakeRecorder(10),
+		},
+		i.TaskRun,
+		i.Task,
+		i.ClusterTask,
+		i.PipelineResource,
+		i.Pod,
+		entrypointCache,
+		th,
+	)
+	th.AddTrCallBackFunc(trc.Enqueue)
+
 	return test.TestAssets{
-		Controller: NewController(
-			reconciler.Options{
-				Logger:            zap.New(observer).Sugar(),
-				KubeClientSet:     c.Kube,
-				PipelineClientSet: c.Pipeline,
-				ConfigMapWatcher:  configMapWatcher,
-			},
-			i.TaskRun,
-			i.Task,
-			i.ClusterTask,
-			i.PipelineResource,
-			i.Pod,
-			entrypointCache,
-		),
-		Logs:      logs,
-		Clients:   c,
-		Informers: i,
+		Controller: trc,
+		Logs:       logs,
+		Clients:    c,
+		Informers:  i,
 	}
 }
 
