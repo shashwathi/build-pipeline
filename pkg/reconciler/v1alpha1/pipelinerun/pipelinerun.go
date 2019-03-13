@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -129,11 +130,11 @@ func NewController(
 		DeleteFunc: impl.Enqueue,
 	})
 
-	r.tracker = tracker.New(impl.EnqueueKey, opt.GetTrackerLease())
+	r.tracker = tracker.New(impl.EnqueueKey, 30*time.Minute)
 	taskRunInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: controller.PassNew(impl.EnqueueControllerOf),
 		AddFunc:    impl.EnqueueControllerOf,
-		DeleteFunc: impl.EnqueueControllerOf,
+		//	DeleteFunc: impl.EnqueueControllerOf,
 	})
 
 	r.Logger.Info("Setting up ConfigMap receivers")
@@ -347,6 +348,7 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1alpha1.PipelineRun) er
 	candidateTasks, err := dag.GetSchedulable(d, pipelineState.SuccessfulPipelineTaskNames()...)
 	if err != nil {
 		c.Logger.Errorf("Error getting potential next tasks for valid pipelinerun %s: %v", pr.Name, err)
+		return err // TODO(shashwathi): What is suppose to happen here
 	}
 	rprts := pipelineState.GetNextTasks(candidateTasks)
 
@@ -369,21 +371,42 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1alpha1.PipelineRun) er
 	}
 
 	before := pr.Status.GetCondition(duckv1alpha1.ConditionSucceeded)
-	statusKey := fmt.Sprintf("%s/%s/%s", pipelineRunControllerName, pr.Namespace, pr.Name)
+	//statusKey := fmt.Sprintf("%s/%s/%s", pipelineRunControllerName, pr.Namespace, pr.Name)
 
-	c.timeoutHandler.StatusLock(statusKey)
-
+	//	c.timeoutHandler.StatusLock(statusKey)
 	prStatus := resources.GetPipelineConditionStatus(pr.Name, pipelineState, c.Logger, pr.Status.StartTime, pr.Spec.Timeout)
 	pr.Status.SetCondition(prStatus)
+	//	c.timeoutHandler.StatusUnlock(statusKey)
 
-	c.timeoutHandler.StatusUnlock(statusKey)
-
+	emitEvent(c.Recorder, before, prStatus, pr, c.Logger)
 	updateTaskRunsStatus(pr, pipelineState)
-	after := pr.Status.GetCondition(duckv1alpha1.ConditionSucceeded)
-	reconciler.EmitEvent(c.Recorder, before, after, pr)
 
-	c.Logger.Infof("PipelineRun %s status is being set to %s", pr.Name, after)
+	c.Logger.Infof("PipelineRun %s/%s status is being set to %s from %s", pr.Namespace, pr.Name, prStatus, before)
 	return nil
+}
+
+// EmitEvent emits success or failed event for object
+// if afterCondition is different from beforeCondition
+func emitEvent(c record.EventRecorder,
+	beforeCondition *duckv1alpha1.Condition,
+	afterCondition *duckv1alpha1.Condition,
+	pr *v1alpha1.PipelineRun,
+	logger *zap.SugaredLogger,
+) {
+	c.Event(pr, corev1.EventTypeNormal, "BLAH Succeeded", "")
+
+	if !reflect.DeepEqual(beforeCondition, afterCondition) && afterCondition != nil {
+		logger.Info("==> before and after conditions are diff ....")
+		// Create events when the obj result is in.
+		if afterCondition.Status == corev1.ConditionTrue {
+			logger.Info("==> emitting event for success ....")
+			c.Event(pr, corev1.EventTypeNormal, "Succeeded", afterCondition.Message)
+		} else if afterCondition.Status == corev1.ConditionFalse {
+			logger.Info("==> emitting event for failure ....")
+			c.Event(pr, corev1.EventTypeWarning, "Failed", afterCondition.Message)
+		}
+	}
+	logger.Info("==> attempted emitEvent func...")
 }
 
 func updateTaskRunsStatus(pr *v1alpha1.PipelineRun, pipelineState []*resources.ResolvedPipelineRunTask) {
@@ -464,13 +487,14 @@ func (c *Reconciler) updateStatus(pr *v1alpha1.PipelineRun) (*v1alpha1.PipelineR
 }
 
 func (c *Reconciler) updateLabels(pr *v1alpha1.PipelineRun) (*v1alpha1.PipelineRun, error) {
-	newPr, err := c.pipelineRunLister.PipelineRuns(pr.Namespace).Get(pr.Name)
+	newPr, err := c.PipelineClientSet.TektonV1alpha1().PipelineRuns(pr.Namespace).Get(pr.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Error getting PipelineRun %s when updating labels: %s", pr.Name, err)
 	}
-	if !reflect.DeepEqual(pr.ObjectMeta.Labels, newPr.ObjectMeta.Labels) {
-		newPr.ObjectMeta.Labels = pr.ObjectMeta.Labels
-		return c.PipelineClientSet.TektonV1alpha1().PipelineRuns(pr.Namespace).Update(newPr)
+	if reflect.DeepEqual(pr.ObjectMeta.Labels, newPr.ObjectMeta.Labels) {
+		return newPr, nil
 	}
-	return newPr, nil
+	newPRun := newPr.DeepCopy()
+	newPRun.ObjectMeta.Labels = pr.ObjectMeta.Labels
+	return c.PipelineClientSet.TektonV1alpha1().PipelineRuns(pr.Namespace).Update(newPRun)
 }

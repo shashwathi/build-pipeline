@@ -284,6 +284,7 @@ func (c *Impl) processNextWorkItem() bool {
 
 func (c *Impl) handleErr(err error, key string) {
 	c.logger.Error(zap.Error(err))
+	fmt.Println("==> IsPermanentError", IsPermanentError(err))
 
 	// Re-queue the key if it's an transient error.
 	if !IsPermanentError(err) {

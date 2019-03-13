@@ -79,44 +79,44 @@ func TestPipelineRun(t *testing.T) {
 		expectedTaskRuns: []string{"create-file-kritis", "create-fan-out-1", "create-fan-out-2", "check-fan-in"},
 		// 1 from PipelineRun and 4 from Tasks defined in pipelinerun
 		expectedNumberOfEvents: 5,
-	}, {
-		name: "service account propagation",
-		testSetup: func(t *testing.T, c *clients, namespace string, index int) {
-			t.Helper()
-			if _, err := c.KubeClient.Kube.CoreV1().Secrets(namespace).Create(getPipelineRunSecret(index, namespace)); err != nil {
-				t.Fatalf("Failed to create secret `%s`: %s", getName(secretName, index), err)
-			}
+		// }, {
+		// 	name: "service account propagation",
+		// 	testSetup: func(t *testing.T, c *clients, namespace string, index int) {
+		// 		t.Helper()
+		// 		if _, err := c.KubeClient.Kube.CoreV1().Secrets(namespace).Create(getPipelineRunSecret(index, namespace)); err != nil {
+		// 			t.Fatalf("Failed to create secret `%s`: %s", getName(secretName, index), err)
+		// 		}
 
-			if _, err := c.KubeClient.Kube.CoreV1().ServiceAccounts(namespace).Create(getPipelineRunServiceAccount(index, namespace)); err != nil {
-				t.Fatalf("Failed to create SA `%s`: %s", getName(saName, index), err)
-			}
+		// 		if _, err := c.KubeClient.Kube.CoreV1().ServiceAccounts(namespace).Create(getPipelineRunServiceAccount(index, namespace)); err != nil {
+		// 			t.Fatalf("Failed to create SA `%s`: %s", getName(saName, index), err)
+		// 		}
 
-			task := tb.Task(getName(taskName, index), namespace, tb.TaskSpec(
-				// Reference build: https://github.com/knative/build/tree/master/test/docker-basic
-				tb.Step("config-docker", "gcr.io/cloud-builders/docker",
-					tb.Command("docker"),
-					tb.Args("pull", "gcr.io/build-crd-testing/secret-sauce"),
-					tb.VolumeMount("docker-socket", "/var/run/docker.sock"),
-				),
-				tb.TaskVolume("docker-socket", tb.VolumeSource(corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/var/run/docker.sock",
-						Type: newHostPathType(string(corev1.HostPathSocket)),
-					},
-				})),
-			))
-			if _, err := c.TaskClient.Create(task); err != nil {
-				t.Fatalf("Failed to create Task `%s`: %s", getName(taskName, index), err)
-			}
+		// 		task := tb.Task(getName(taskName, index), namespace, tb.TaskSpec(
+		// 			// Reference build: https://github.com/knative/build/tree/master/test/docker-basic
+		// 			tb.Step("config-docker", "gcr.io/cloud-builders/docker",
+		// 				tb.Command("docker"),
+		// 				tb.Args("pull", "gcr.io/build-crd-testing/secret-sauce"),
+		// 				tb.VolumeMount("docker-socket", "/var/run/docker.sock"),
+		// 			),
+		// 			tb.TaskVolume("docker-socket", tb.VolumeSource(corev1.VolumeSource{
+		// 				HostPath: &corev1.HostPathVolumeSource{
+		// 					Path: "/var/run/docker.sock",
+		// 					Type: newHostPathType(string(corev1.HostPathSocket)),
+		// 				},
+		// 			})),
+		// 		))
+		// 		if _, err := c.TaskClient.Create(task); err != nil {
+		// 			t.Fatalf("Failed to create Task `%s`: %s", getName(taskName, index), err)
+		// 		}
 
-			if _, err := c.PipelineClient.Create(getHelloWorldPipelineWithSingularTask(index, namespace)); err != nil {
-				t.Fatalf("Failed to create Pipeline `%s`: %s", getName(pipelineName, index), err)
-			}
-		},
-		expectedTaskRuns: []string{task1Name},
-		// 1 from PipelineRun and 1 from Tasks defined in pipelinerun
-		expectedNumberOfEvents: 2,
-		pipelineRunFunc:        getHelloWorldPipelineRun,
+		// 		if _, err := c.PipelineClient.Create(getHelloWorldPipelineWithSingularTask(index, namespace)); err != nil {
+		// 			t.Fatalf("Failed to create Pipeline `%s`: %s", getName(pipelineName, index), err)
+		// 		}
+		// 	},
+		// 	expectedTaskRuns: []string{task1Name},
+		// 	// 1 from PipelineRun and 1 from Tasks defined in pipelinerun
+		// 	expectedNumberOfEvents: 2,
+		// 	pipelineRunFunc:        getHelloWorldPipelineRun,
 	}}
 
 	for i, td := range tds {
@@ -176,6 +176,14 @@ func TestPipelineRun(t *testing.T) {
 			matchKinds := map[string][]string{"PipelineRun": {prName}, "TaskRun": expectedTaskRunNames}
 
 			logger.Infof("Making sure %d events were created from taskrun and pipelinerun with kinds %v", td.expectedNumberOfEvents, matchKinds)
+			prNew, err := c.PipelineRunClient.Get(prName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create PipelineRun `%s`: %s", prName, err)
+			}
+
+			if !prNew.Status.GetCondition(duckv1alpha1.ConditionSucceeded).IsTrue() {
+				t.Fatalf("Expected it to be true: %#+v", prNew.Status)
+			}
 
 			events, err := collectMatchingEvents(c.KubeClient, namespace, matchKinds, "Succeeded")
 			if err != nil {

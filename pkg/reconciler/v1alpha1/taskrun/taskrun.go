@@ -172,15 +172,13 @@ func (c *Reconciler) Reconcile(ctx context.Context, key string) error {
 	if tr.Status.IsDone() {
 		statusMapKey := fmt.Sprintf("%s/%s", taskRunControllerName, key)
 		c.timeoutHandler.Release(statusMapKey)
+		c.Recorder.Event(tr, corev1.EventTypeNormal, eventReasonSucceeded, "TaskRun completed successfully.")
 		return nil
 	}
 
 	// Reconcile this copy of the task run and then write back any status
 	// updates regardless of whether the reconciliation errored out.
-	if err := c.reconcile(ctx, tr); err != nil {
-		c.Logger.Errorf("Reconcile error: %v", err.Error())
-		return err
-	}
+	err = c.reconcile(ctx, tr)
 	if equality.Semantic.DeepEqual(original.Status, tr.Status) {
 		// If we didn't change anything then don't call updateStatus.
 		// This is important because the copy we loaded from the informer's
@@ -390,7 +388,7 @@ func (c *Reconciler) updateStatus(taskrun *v1alpha1.TaskRun) (*v1alpha1.TaskRun,
 }
 
 func (c *Reconciler) updateLabels(tr *v1alpha1.TaskRun) (*v1alpha1.TaskRun, error) {
-	newTr, err := c.taskRunLister.TaskRuns(tr.Namespace).Get(tr.Name)
+	newTr, err := c.PipelineClientSet.TektonV1alpha1().TaskRuns(tr.Namespace).Get(tr.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Error getting TaskRun %s when updating labels: %s", tr.Name, err)
 	}

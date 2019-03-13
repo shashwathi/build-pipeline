@@ -81,7 +81,7 @@ func (state PipelineRunState) SuccessfulPipelineTaskNames() []string {
 	for _, t := range state {
 		if t.TaskRun != nil {
 			c := t.TaskRun.Status.GetCondition(duckv1alpha1.ConditionSucceeded)
-			if c.IsTrue() {
+			if c != nil && c.IsTrue() {
 				done = append(done, t.PipelineTask.Name)
 			}
 		}
